@@ -1,0 +1,13 @@
+## Interface: 16001
+## Title: Soul Journal
+## Notes: A warlock's ledger of every soul trapped in a Soul Shard. Right-click a shard or type /souls.
+## Author: Phillyp
+## Version: @project-version@
+## SavedVariablesPerCharacter: SoulJournalDB
+## IconTexture: Interface\Icons\INV_Misc_Gem_Amethyst_02
+## X-Category: Class
+## X-Curse-Project-ID: 1754433
+## X-License: MIT
+
+Core.lua
+UI.lua

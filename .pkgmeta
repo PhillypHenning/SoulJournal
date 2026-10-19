@@ -1,0 +1,5 @@
+package-as: SoulJournal
+
+ignore:
+  - README.md
+  - Media/make-shard.ps1
