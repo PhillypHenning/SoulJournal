@@ -5,7 +5,9 @@ ghost sealed inside a crystal shard. You can page through them with the arrows o
 
 - **Open:** right-click a Soul Shard in your bags, or type `/souls`
 - **Records:** name, level at capture, elite/rare status, creature type (or race/class for players), zone, time, your level and the spell used (Drain Soul or Shadowburn)
-- **Bound vs. released:** when a shard is spent, the oldest soul is marked released (shards can't be told apart, so first in, first out)
+- **Sparks:** a shard from a Drain Soul tick (before the kill) is a spark of that creature's soul and shows as a twinkling star on its crystal. If the creature dies some other way, its sparks stay in the journal without the soul
+- **Bound vs. released:** when a shard is spent, sparks go first, then the oldest soul is marked released (shards can't be told apart, so first in, first out). Released souls show what took the shard: the spell (Create Healthstone, Ritual of Summoning, ...), or a vendor, trade or mail window
+- **Keep:** tick "Keep this soul" on a bound soul to protect it. Kept souls and their sparks are passed over when shards are spent, and are released only once every other shard is gone
 - `/souls clear` erases the journal (per character)
 
 Built for **WoW Forever** (interface 16001) only.

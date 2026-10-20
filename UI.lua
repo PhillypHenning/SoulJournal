@@ -19,7 +19,18 @@ local CLASSIFICATION_COLOR = {
 	worldboss = { 1, 0.5, 0.25 },
 }
 
-local frame, ghost, prevButton, nextButton
+local RELEASED_HOW = {
+	sold = "Sold to a vendor",
+	traded = "Traded away",
+	mailed = "Sent by mail",
+}
+
+-- Where spark stars sit on the 240px shard, inside its outline. Sparks beyond the last
+-- point still count; they just don't get a star of their own.
+local STAR_POINTS = { { 94, -80 }, { 150, -94 }, { 164, -136 }, { 141, -164 }, { 117, -197 }, { 80, -150 } }
+local stars = {}
+
+local frame, ghost, prevButton, nextButton, keepButton
 local nameText, detailText, zoneText, captureText, statusText, counterText, emptyText
 local view, pos = {}, 0
 
@@ -134,7 +145,7 @@ end
 -- Players and souls whose identity was hidden have no NPC id to rebuild, so they
 -- appear as a generic human ghost.
 local function ShowGhost(soul)
-	ghost.ghostAlpha = soul.released and RELEASED_ALPHA or GHOST_ALPHA
+	ghost.ghostAlpha = (soul.released or soul.sparkOnly) and RELEASED_ALPHA or GHOST_ALPHA
 	ghost:Show()
 	ghost:ClearModel()
 	ghost.emoting = nil
@@ -152,7 +163,9 @@ local function Refresh()
 
 	if count == 0 then
 		ghost:Hide()
+		for _, star in ipairs(stars) do star:Hide() end
 		emptyText:Show()
+		keepButton:Hide()
 		if ns.db.tab == TAB_RELEASED then
 			emptyText:SetText("No souls released yet.\nSpent shards appear here.")
 		elseif #ns.db.souls > 0 then
@@ -186,13 +199,32 @@ local function Refresh()
 		soul.playerLevel or "?",
 		soul.method and ("  -  " .. soul.method) or ""))
 
+	local sparks = soul.sparks or 0
+	for i, star in ipairs(stars) do star:SetShown(i <= sparks) end
+
 	if soul.released then
-		statusText:SetText("Released " .. date("%b %d, %Y", soul.released))
+		local how = soul.releasedBy and ("Used for " .. soul.releasedBy) or RELEASED_HOW[soul.releasedHow]
+		local what = soul.sparkOnly and "Sparks spent " or "Released "
+		statusText:SetText(what .. date("%b %d, %Y", soul.released) .. (how and ("\n" .. how) or ""))
 		statusText:SetTextColor(0.55, 0.55, 0.55)
 	else
-		statusText:SetText("Bound within a Soul Shard")
-		statusText:SetTextColor(0.4, 1, 0.5)
+		local status = soul.sparkOnly and "Sparks drawn, but the soul slipped away"
+			or soul.kept and "Bound within a Soul Shard  -  Kept"
+			or "Bound within a Soul Shard"
+		if sparks > 0 then
+			status = status .. ("\n%d soul spark%s held"):format(sparks, sparks == 1 and "" or "s")
+		end
+		statusText:SetText(status)
+		if soul.sparkOnly then
+			statusText:SetTextColor(0.75, 0.6, 1)
+		else
+			statusText:SetTextColor(0.4, 1, 0.5)
+		end
 	end
+
+	-- Only a whole, bound soul can be kept; sparks alone ride along with their soul.
+	keepButton:SetShown(not soul.released and not soul.sparkOnly)
+	keepButton:SetChecked(soul.kept == true)
 
 	counterText:SetText(("Soul %d of %d"):format(pos, count))
 end
@@ -304,6 +336,26 @@ local function Build()
 	facets:SetAllPoints()
 	facets:SetTexture(MEDIA .. "ShardFront")
 
+	-- Each spark is a star twinkling on the crystal's face, each on its own rhythm.
+	for i, point in ipairs(STAR_POINTS) do
+		local star = face:CreateTexture(nil, "OVERLAY")
+		star:SetTexture("Interface\\Cooldown\\star4")
+		star:SetBlendMode("ADD")
+		star:SetVertexColor(0.85, 0.75, 1)
+		star:SetSize(26, 26)
+		star:SetPoint("CENTER", shard, "TOPLEFT", point[1], point[2])
+		local twinkle = star:CreateAnimationGroup()
+		twinkle:SetLooping("BOUNCE")
+		local fadeStar = twinkle:CreateAnimation("Alpha")
+		fadeStar:SetFromAlpha(0.25)
+		fadeStar:SetToAlpha(1)
+		fadeStar:SetDuration(0.7 + i * 0.19)
+		fadeStar:SetSmoothing("IN_OUT")
+		twinkle:Play()
+		star:Hide()
+		stars[i] = star
+	end
+
 	emptyText = face:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	emptyText:SetPoint("CENTER")
 	emptyText:SetWidth(200)
@@ -321,6 +373,33 @@ local function Build()
 
 	counterText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	counterText:SetPoint("BOTTOMRIGHT", -14, 14)
+
+	keepButton = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
+	keepButton:SetSize(24, 24)
+	keepButton:SetPoint("BOTTOMLEFT", 10, 8)
+	local keepLabel = keepButton:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	keepLabel:SetPoint("LEFT", keepButton, "RIGHT", 0, 1)
+	keepLabel:SetText("Keep this soul")
+	-- Let the label take clicks and show the tooltip too.
+	keepButton:SetHitRectInsets(0, -keepLabel:GetStringWidth(), 0, 0)
+	keepButton:SetScript("OnClick", function(self)
+		local soul = ns.db.souls[view[pos]]
+		if not soul then return end
+		soul.kept = self:GetChecked() or nil
+		PlaySound(self:GetChecked() and (SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856)
+			or (SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_OFF or 857))
+		Refresh()
+	end)
+	keepButton:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT")
+		GameTooltip:SetText("Keep this soul", 1, 1, 1)
+		GameTooltip:AddLine("Soul Shards all look alike, so whenever you spend one, the journal releases your oldest soul.", nil, nil, nil, true)
+		GameTooltip:AddLine(" ")
+		GameTooltip:AddLine("A kept soul (and its sparks) is passed over and released only after every other shard is gone.", 0.75, 0.6, 1, true)
+		GameTooltip:Show()
+	end)
+	keepButton:SetScript("OnLeave", GameTooltip_Hide)
+	keepButton:Hide()
 
 	-- Tabs hang off the bottom edge like the character sheet's; PanelTemplates expects
 	-- them to be named <frame>Tab<n>.
